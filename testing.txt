@@ -1,0 +1,386 @@
+1	STRUCT
+1	ID:Pt
+1	LACC
+2	TYPE_INT
+2	ID:x
+2	SEMICOLON
+3	TYPE_INT
+3	ID:y
+3	SEMICOLON
+4	RACC
+4	SEMICOLON
+6	STRUCT
+6	ID:Pt
+6	ID:points
+6	LBRACKET
+6	INT:10
+6	RBRACKET
+6	SEMICOLON
+8	TYPE_DOUBLE
+8	ID:max
+8	LPAR
+8	TYPE_DOUBLE
+8	ID:a
+8	8	TYPE_DOUBLE
+8	ID:b
+8	RPAR
+8	LACC
+9	IF
+9	LPAR
+9	ID:a
+9	GREATER
+9	ID:b
+9	RPAR
+9	RETURN
+9	ID:a
+9	SEMICOLON
+10	ELSE
+10	RETURN
+10	ID:b
+11	RACC
+13	TYPE_INT
+13	ID:len
+13	LPAR
+13	TYPE_CHAR
+13	ID:s
+13	LBRACKET
+13	RBRACKET
+13	RPAR
+13	LACC
+14	TYPE_INT
+14	ID:i
+14	SEMICOLON
+15	ID:i
+15	ASSIGN
+15	INT:0
+15	SEMICOLON
+16	WHILE
+16	LPAR
+16	ID:s
+16	LBRACKET
+16	ID:i
+16	RBRACKET
+16	RPAR
+16	ID:i
+16	ASSIGN
+16	ID:i
+16	ADD
+16	INT:1
+16	SEMICOLON
+17	RETURN
+17	ID:i
+17	SEMICOLON
+18	RACC
+20	VOID
+20	ID:main
+20	LPAR
+20	RPAR
+20	LACC
+21	TYPE_INT
+21	ID:i
+21	SEMICOLON
+22	ID:i
+22	ASSIGN
+22	INT:10
+22	SEMICOLON
+23	WHILE
+23	LPAR
+23	ID:i
+23	NOTEQ
+23	INT:0
+23	RPAR
+23	LACC
+24	ID:puti
+24	LPAR
+24	ID:i
+24	RPAR
+24	SEMICOLON
+25	ID:i
+25	ASSIGN
+25	ID:i
+25	DIV
+25	INT:2
+25	SEMICOLON
+26	RACC
+27	RACC
+28	END
+#unit: VOID
+E structDef?
+consume(VOID) => consumed
+consume(ID) => consumed
+consume(ASSIGN) => consumed
+E varDef?
+typeBase?
+consume(RETURN) => consumed
+consume(ID) => consumed
+arrayDecl?
+consume(GREATER) => found CHAR
+consume(CHAR) => consumed
+E varDef?
+typeBase?
+consume(RETURN) => consumed
+consume(ID) => consumed
+arrayDecl?
+consume(GREATER) => found CHAR
+consume(CHAR) => consumed
+E varDef?
+typeBase?
+consume(RETURN) => found EQUAL
+consume(STRUCT) => found EQUAL
+consume(TYPE-INT) => found EQUAL
+consume(VOID) => found EQUAL
+consume(EQUAL) => consumed
+consume(CHAR) => consumed
+E structDef?
+consume(VOID) => consumed
+consume(ID) => consumed
+consume(ASSIGN) => found ID
+#fnDef: VOID
+consume(WHILE) => found VOID
+typeBase?
+consume(RETURN) => found VOID
+consume(STRUCT) => found VOID
+consume(TYPE-INT) => found VOID
+consume(VOID) => consumed
+consume(ID) => consumed
+consume(ID) => consumed
+consume(OR) => found GREATER
+E varDef?
+typeBase?
+consume(RETURN) => found VOID
+consume(STRUCT) => found VOID
+consume(TYPE-INT) => found VOID
+consume(VOID) => consumed
+consume(ID) => consumed
+consume(ID) => consumed
+arrayDecl?
+consume(GREATER) => consumed
+consume(TYPE-CHAR) => consumed
+consume(GREATEREQ) => consumed
+consume(CHAR) => consumed
+E structDef?
+consume(VOID) => found STRUCT
+#fnDef: STRUCT
+consume(WHILE) => found STRUCT
+typeBase?
+consume(RETURN) => found STRUCT
+consume(STRUCT) => consumed
+consume(ID) => consumed
+consume(OR) => consumed
+#fnParam: STRUCT
+typeBase?
+consume(RETURN) => found STRUCT
+consume(STRUCT) => consumed
+consume(ID) => consumed
+arrayDecl?
+consume(GREATER) => found INT
+consume(INT) => consumed
+#fnParam: STRUCT
+typeBase?
+consume(RETURN) => found STRUCT
+consume(STRUCT) => consumed
+consume(ID) => consumed
+arrayDecl?
+consume(GREATER) => found NOT
+consume(INT) => found NOT
+consume(NOT) => consumed
+#stmCompound: ASSIGN
+consume(ASSIGN) => consumed
+E varDef?
+typeBase?
+consume(RETURN) => found LESS
+consume(STRUCT) => found LESS
+consume(TYPE-INT) => found LESS
+consume(VOID) => found LESS
+#stm: LESS
+#stmCompound: LESS
+consume(ASSIGN) => found LESS
+consume(LESS) => consumed
+consume(OR) => consumed
+#expr: ID
+#exprAssign: ID
+#exprUnary: ID
+consume(END) => found ID
+consume(SUB) => found ID
+#exprPostfix: ID
+#exprPrimary ID
+consume(ID) => consumed
+consume(OR) => found DOT
+#exprPostfixPrim: DOT
+consume(GREATER) => found DOT
+consume(COMMA) => found DOT
+consume(SEMICOLON) => found DOT
+#exprOr: ID
+#exprAnd: ID
+#exprEq: ID
+#exprRel: ID
+#exprAdd: ID
+#exprMul: ID
+#exprCast: ID
+consume(OR) => found ID
+#exprUnary: ID
+consume(END) => found ID
+consume(SUB) => found ID
+#exprPostfix: ID
+#exprPrimary ID
+consume(ID) => consumed
+consume(OR) => found DOT
+#exprPostfixPrim: DOT
+consume(GREATER) => found DOT
+consume(COMMA) => found DOT
+#exprMulPrim: DOT
+consume(RACC) => found DOT
+consume(LBRACKET) => found DOT
+#exprAddPrim: DOT
+consume(RBRACKET) => found DOT
+consume(END) => found DOT
+#exprRelPrim: DOT
+consume(RPAR) => found DOT
+consume(DIV) => found DOT
+consume(DOT) => consumed
+#exprAdd: ID
+#exprMul: ID
+#exprCast: ID
+consume(OR) => found ID
+#exprUnary: ID
+consume(END) => found ID
+consume(SUB) => found ID
+#exprPostfix: ID
+#exprPrimary ID
+consume(ID) => consumed
+consume(OR) => found NOT
+#exprPostfixPrim: NOT
+consume(GREATER) => found NOT
+consume(COMMA) => found NOT
+#exprMulPrim: NOT
+consume(RACC) => found NOT
+consume(LBRACKET) => found NOT
+#exprAddPrim: NOT
+consume(RBRACKET) => found NOT
+consume(END) => found NOT
+#exprRelPrim: NOT
+consume(RPAR) => found NOT
+consume(DIV) => found NOT
+consume(DOT) => found NOT
+consume(AND) => found NOT
+#exprEqPrim: NOT
+consume(LPAR) => found NOT
+consume(MUL) => found NOT
+#exprAndPrim: NOT
+consume(LACC) => found NOT
+#exprOrPrim: NOT
+consume(ADD) => found NOT
+consume(NOT) => consumed
+#stm: STRING
+#stmCompound: STRING
+consume(ASSIGN) => found STRING
+consume(LESS) => found STRING
+consume(NOTEQ) => found STRING
+consume(STRING) => consumed
+#expr: ID
+#exprAssign: ID
+#exprUnary: ID
+consume(END) => found ID
+consume(SUB) => found ID
+#exprPostfix: ID
+#exprPrimary ID
+consume(ID) => consumed
+consume(OR) => found CHAR
+#exprPostfixPrim: CHAR
+consume(GREATER) => found CHAR
+consume(COMMA) => found CHAR
+consume(SEMICOLON) => found CHAR
+#exprOr: ID
+#exprAnd: ID
+#exprEq: ID
+#exprRel: ID
+#exprAdd: ID
+#exprMul: ID
+#exprCast: ID
+consume(OR) => found ID
+#exprUnary: ID
+consume(END) => found ID
+consume(SUB) => found ID
+#exprPostfix: ID
+#exprPrimary ID
+consume(ID) => consumed
+consume(OR) => found CHAR
+#exprPostfixPrim: CHAR
+consume(GREATER) => found CHAR
+consume(COMMA) => found CHAR
+#exprMulPrim: CHAR
+consume(RACC) => found CHAR
+consume(LBRACKET) => found CHAR
+#exprAddPrim: CHAR
+consume(RBRACKET) => found CHAR
+consume(END) => found CHAR
+#exprRelPrim: CHAR
+consume(RPAR) => found CHAR
+consume(DIV) => found CHAR
+consume(DOT) => found CHAR
+consume(AND) => found CHAR
+#exprEqPrim: CHAR
+consume(LPAR) => found CHAR
+consume(MUL) => found CHAR
+#exprAndPrim: CHAR
+consume(LACC) => found CHAR
+#exprOrPrim: CHAR
+consume(ADD) => found CHAR
+consume(CHAR) => consumed
+consume(LESSEQ) => consumed
+#stm: STRING
+#stmCompound: STRING
+consume(ASSIGN) => found STRING
+consume(LESS) => found STRING
+consume(NOTEQ) => found STRING
+consume(STRING) => consumed
+#expr: ID
+#exprAssign: ID
+#exprUnary: ID
+consume(END) => found ID
+consume(SUB) => found ID
+#exprPostfix: ID
+#exprPrimary ID
+consume(ID) => consumed
+consume(OR) => found EQUAL
+#exprPostfixPrim: EQUAL
+consume(GREATER) => found EQUAL
+consume(COMMA) => found EQUAL
+consume(SEMICOLON) => found EQUAL
+#exprOr: ID
+#exprAnd: ID
+#exprEq: ID
+#exprRel: ID
+#exprAdd: ID
+#exprMul: ID
+#exprCast: ID
+consume(OR) => found ID
+#exprUnary: ID
+consume(END) => found ID
+consume(SUB) => found ID
+#exprPostfix: ID
+#exprPrimary ID
+consume(ID) => consumed
+consume(OR) => found EQUAL
+#exprPostfixPrim: EQUAL
+consume(GREATER) => found EQUAL
+consume(COMMA) => found EQUAL
+#exprMulPrim: EQUAL
+consume(RACC) => found EQUAL
+consume(LBRACKET) => found EQUAL
+#exprAddPrim: EQUAL
+consume(RBRACKET) => found EQUAL
+consume(END) => found EQUAL
+#exprRelPrim: EQUAL
+consume(RPAR) => found EQUAL
+consume(DIV) => found EQUAL
+consume(DOT) => found EQUAL
+consume(AND) => found EQUAL
+#exprEqPrim: EQUAL
+consume(LPAR) => found EQUAL
+consume(MUL) => found EQUAL
+#exprAndPrim: EQUAL
+consume(LACC) => found EQUAL
+#exprOrPrim: EQUAL
+consume(ADD) => found EQUAL
+consume(CHAR) => found EQUAL
