@@ -5,9 +5,10 @@
 #include "parser.h" 
 #include "utils.h"
 #include "ad.h"
+#include "at.h"
 
 int main() {
-    char *inbuf = loadFile("tests/testad.c");
+    char *inbuf = loadFile("tests/testat.c");
     if (inbuf == NULL) {
         fprintf(stderr, "Failed to load file\n");
         return 1;
