@@ -444,3 +444,16 @@ void showTokens(const Token *tokens)
 		line_counter += 1;
 	}
 }
+
+
+
+char *tkCodeName(int code)
+{
+    char *Names[] = {"ID",
+                     "TYPE-CHAR", "TYPE-DOUBLE", "ELSE", "IF", "TYPE-INT", "RETURN", "STRUCT", "VOID", "WHILE",
+                     "INT", "DOUBLE", "CHAR", "STRING",
+                     "COMMA", "SEMICOLON", "LPAR", "RPAR", "LBRACKET", "RBRACKET", "LACC", "RACC", "END",
+                     "ADD", "SUB", "MUL", "DIV", "DOT", "AND", "OR", "NOT", "ASSIGN", "EQUAL",
+                     "NOTEQ", "LESS", "LESSEQ", "GREATER", "GREATEREQ"};
+    return Names[code];
+}

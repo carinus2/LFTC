@@ -4,9 +4,10 @@
 #include "lexer.h"
 #include "parser.h" 
 #include "utils.h"
+#include "ad.h"
 
 int main() {
-    char *inbuf = loadFile("tests/testparser.c");
+    char *inbuf = loadFile("tests/testad.c");
     if (inbuf == NULL) {
         fprintf(stderr, "Failed to load file\n");
         return 1;
@@ -20,8 +21,15 @@ int main() {
     }
 
     showTokens(tokens);
+
+    pushDomain();
+
     parse(tokens);
    
+    showDomain(symTable,"global");
+
+    dropDomain();
+
     printf("Parsing completed successfully.\n");
 
 
