@@ -7,11 +7,12 @@
 #include "ad.h"
 #include "lexer.h"
 #include "at.h"
+#include <string.h>
 
 Token *iTk;        // the iterator in the tokens list
 Token *consumedTk; // the last consumed token
 Token *start;
-Symbol *owner = NULL; // the current owner of the symbols
+Symbol *owner; // the current owner of the symbols
 
 bool unit();
 bool structDef();
@@ -115,7 +116,7 @@ bool structDef()
                 s->type.n = -1;
                 pushDomain();
                 owner = s;
-                for (;;)
+                while(1)
                 {
                     if (varDef())
                     {
@@ -233,8 +234,9 @@ bool varDef()
 // typeBase: TYPE_INT | TYPE_DOUBLE | TYPE_CHAR | STRUCT ID
 bool typeBase(Type *t)
 {
-    t->n = -1;
     start = iTk;
+    t->n = -1;
+   
     printf("typeBase?\n");
     if (consume(TYPE_INT))
     {
@@ -415,38 +417,41 @@ bool fnDef()
 }
 
 // fnParam: typeBase ID arrayDecl?
-bool fnParam()
-{
-    printf("#fnParam: %s\n", tkCodeName(iTk->code));
-    Type t;
-    Token *start = iTk;
-    if (typeBase(&t))
-    {
-        if (consume(ID))
-        {
-            Token *tkName = consumedTk;
-            if (arrayDecl(&t))
-            {
-                t.n = 0;
-                return true;
+bool fnParam() { 
+	Type t;
+	if(typeBase(&t))
+	{
+		if(consume(ID))
+		{
+			Token *tkName = consumedTk;
+
+			if(arrayDecl(&t))
+			{
+				t.n = 0;
+			}
+
+			Symbol *param = findSymbolInDomain(symTable, tkName->text);
+
+            if (param) 
+			{
+                tkerr("Symbol is already defined: %s", tkName->text); //numele parametrului trebuie sa fie unic in domeniu
             }
-            Symbol *param = findSymbolInDomain(symTable, tkName->text);
-            if (param)
-                tkerr("symbol redefinition: %s", tkName->text);
+
             param = newSymbol(tkName->text, SK_PARAM);
             param->type = t;
             param->owner = owner;
-            param->paramIdx = symbolsLen(owner->fn.params);
-            // parametrul este adaugat atat la domeniul curent, cat si la parametrii fn
-            addSymbolToDomain(symTable, param);
+            param->paramIdx = symbolsLen(owner->fn.params); //parametrii pot fi vectori cu dimensiune data, dar in acest caz li se sterge dimensiunea ( int v[10] -> int v[] )
+            addSymbolToDomain(symTable, param); //parametrul este adaugat atat la domeniul curent, cat si la parametrii fn
             addSymbolToList(&owner->fn.params, dupSymbol(param));
-            return true;
-        }
-        else
-            tkerr("Lipseste identificatorul in parametrul functiei");
-    }
-    iTk = start;
-    return false;
+
+			return true;
+		}
+		else 
+		{
+			tkerr("Missing variable name\n");
+		}
+	}
+	return false;
 }
 
 // stm: stmCompound
