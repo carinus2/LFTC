@@ -6,7 +6,7 @@
 #include "utils.h"
 #include "ad.h"
 #include "at.h"
-
+#include "vm.h"
 int main() {
     char *inbuf = loadFile("tests/testat.c");
     if (inbuf == NULL) {
@@ -21,13 +21,14 @@ int main() {
         return 1;
     }
 
-    showTokens(tokens);
+    //showTokens(tokens);
 
     pushDomain();
-
+    vmInit();
     parse(tokens);
-   
-    showDomain(symTable,"global");
+    Instr *testCode=genTestProgram(); 
+    run(testCode); 
+    //showDomain(symTable,"global");
 
     dropDomain();
 
