@@ -7,8 +7,10 @@
 #include "ad.h"
 #include "at.h"
 #include "vm.h"
+#include "gc.h"
+
 int main() {
-    char *inbuf = loadFile("tests/testat.c");
+    char *inbuf = loadFile("tests/testgc.c");
     if (inbuf == NULL) {
         fprintf(stderr, "Failed to load file\n");
         return 1;
@@ -26,12 +28,21 @@ int main() {
     pushDomain();
     vmInit();
     parse(tokens);
-    Instr *testCode=genTestProgram(); 
-    run(testCode); 
+    ///Instr *testCode=genTestProgram(); 
+    //run(testCode); 
     //showDomain(symTable,"global");
 
-    dropDomain();
+   // dropDomain();
+    Symbol *symMain = findSymbolInDomain(symTable, "main");
 
+    if (!symMain) {
+        err("missing main function");
+    }
+
+    Instr *entryCode = NULL;
+    addInstr(&entryCode, OP_CALL)->arg.instr = symMain->fn.instr;
+    addInstr(&entryCode, OP_HALT);
+    run(entryCode);
     printf("Parsing completed successfully.\n");
 
 

@@ -8,6 +8,8 @@
 #include "lexer.h"
 #include "at.h"
 #include <string.h>
+#include "vm.h"
+#include "gc.h"
 
 Token *iTk;        // the iterator in the tokens list
 Token *consumedTk; // the last consumed token
@@ -310,7 +312,8 @@ bool fnDef()
     printf("#fnDef: %s\n", tkCodeName(iTk->code));
     Token *start = iTk;
     Type t;
-
+    Instr *startInstr = owner ? lastInstr(owner->fn.instr) : NULL;
+    
     if (consume(VOID))
     {
         t.tb = TB_VOID;
@@ -348,8 +351,14 @@ bool fnDef()
                 }
                 if (consume(RPAR))
                 {
+                    addInstr(&fn->fn.instr, OP_ENTER);
                     if (stmCompound(false))
                     {
+                        fn->fn.instr->arg.i = symbolsLen(fn->fn.locals);
+                        if (fn->type.tb == TB_VOID)
+                        {
+                            addInstrWithInt(&fn->fn.instr, OP_RET_VOID, symbolsLen(fn->fn.params));
+                        }
                         dropDomain();
                         owner = NULL;
                         return true;
@@ -398,8 +407,14 @@ bool fnDef()
                 }
                 if (consume(RPAR))
                 {
+                    addInstr(&fn->fn.instr, OP_ENTER);
                     if (stmCompound(false))
                     {
+                        fn->fn.instr->arg.i = symbolsLen(fn->fn.locals);
+                        if (fn->type.tb == TB_VOID)
+                        {
+                            addInstrWithInt(&fn->fn.instr, OP_RET_VOID, symbolsLen(fn->fn.params));
+                        }
                         dropDomain();
                         owner = NULL;
                         return true;
@@ -413,6 +428,9 @@ bool fnDef()
             tkerr("Lipseste identificatorul in definirea functiei");
     }
     iTk = start;
+    if (owner) {
+        delInstrAfter(startInstr);
+    }
     return false;
 }
 
@@ -463,6 +481,7 @@ bool stm()
 {
     printf("#stm: %s\n", tkCodeName(iTk->code));
     Token *start = iTk;
+    Instr *startInstr = owner ? lastInstr(owner->fn.instr) : NULL;
     
     Ret rCond, rExpr;
     if (stmCompound(true))
@@ -483,16 +502,28 @@ bool stm()
 
                 if (consume(RPAR))
                 {
+                    addRVal(&owner->fn.instr, rCond.lval, &rCond.type);
+                    Type intType = {TB_INT, NULL, -1};
+                    insertConvIfNeeded(lastInstr(owner->fn.instr), &rCond.type, &intType);
+                    Instr *ifJF = addInstr(&owner->fn.instr, OP_JF);
+
                     if (stm())
                     {
                         if (consume(ELSE))
                         {
+                            Instr *ifJMP = addInstr(&owner->fn.instr, OP_JMP);
+                            ifJF->arg.instr = addInstr(&owner->fn.instr, OP_NOP);
+
                             if (stm())
                             {
-                                return true;
+                                ifJMP->arg.instr = addInstr(&owner->fn.instr, OP_NOP);
                             }
                             else
                                 tkerr("Lipseste statement dupa conditia else");
+                        } 
+                        else 
+                        {
+                            ifJF->arg.instr = addInstr(&owner->fn.instr, OP_NOP);
                         }
                         return true;
                     }
@@ -511,6 +542,8 @@ bool stm()
     // | WHILE LPAR expr RPAR stm
     if (consume(WHILE))
     {
+        Instr *beforeWhileCond = lastInstr(owner->fn.instr);
+
         if (consume(LPAR))
         {
             if (expr(&rCond))
@@ -519,8 +552,15 @@ bool stm()
 					tkerr("the while condition must be a scalar value");
                 if (consume(RPAR))
                 {
+                    addRVal(&owner->fn.instr, rCond.lval, &rCond.type);
+                    Type intType = {TB_INT, NULL, -1};
+                    insertConvIfNeeded(lastInstr(owner->fn.instr), &rCond.type, &intType);
+                    Instr *whileJF = addInstr(&owner->fn.instr, OP_JF);
+
                     if (stm())
                     {
+                        addInstr(&owner->fn.instr, OP_JMP)->arg.instr = beforeWhileCond->next;
+                        whileJF->arg.instr = addInstr(&owner->fn.instr, OP_NOP);
                         return true;
                     }
                     else
@@ -554,25 +594,32 @@ bool stm()
 			{
 				tkerr("cannot convert the return expression type to the function return type");
 			}
-		} 
+
+			addRVal(&owner->fn.instr, rExpr.lval, &rExpr.type);
+            insertConvIfNeeded(lastInstr(owner->fn.instr), &rExpr.type, &owner->type);
+            addInstrWithInt(&owner->fn.instr, OP_RET, symbolsLen(owner->fn.params));
+        } 
 		else 
 		{
 			if(owner->type.tb != TB_VOID) {
 				tkerr("a non-void function must return a value");
 			}
-            if (consume(SEMICOLON))
-            {
-                return true;
-            }
-            else
-                tkerr("Lipseste ; in return");
+            addInstr(&owner->fn.instr, OP_RET_VOID);
         }
         if (consume(SEMICOLON))
+        {
             return true;
+        }
+        else
+            tkerr("Lipseste ; in return");
     }
     // | expr? SEMICOLON
     if (expr(&rExpr))
     {
+        if (rExpr.type.tb != TB_VOID) 
+        {
+            addInstr(&owner->fn.instr, OP_DROP);
+        }
         if (consume(SEMICOLON))
         {
             return true;
@@ -584,6 +631,10 @@ bool stm()
         return true;
 
     iTk = start;
+    if (owner) 
+    {
+        delInstrAfter(startInstr);
+    }
     return false;
 }
 
@@ -636,6 +687,7 @@ bool exprAssign(Ret *r)
 {
     printf("#exprAssign: %s\n", tkCodeName(iTk->code));
     Token *start = iTk;
+    Instr *startInstr = owner ? lastInstr(owner->fn.instr) : NULL;
     Ret rDst;
     if (exprUnary(&rDst))
     {
@@ -670,6 +722,19 @@ bool exprAssign(Ret *r)
 
 				r->lval = false;
 				r->ct = true;
+
+				addRVal(&owner->fn.instr, r->lval, &r->type);
+                insertConvIfNeeded(lastInstr(owner->fn.instr), &r->type, &rDst.type);
+                switch (rDst.type.tb) 
+                {
+                    case TB_INT:
+                        addInstr(&owner->fn.instr, OP_STORE_I);
+                        break;
+                    case TB_DOUBLE:
+                        addInstr(&owner->fn.instr, OP_STORE_F);
+                        break;
+                }
+
                 return true;
             }
             else
@@ -677,11 +742,20 @@ bool exprAssign(Ret *r)
         }
     }
     iTk = start;
-    if (exprOr(r))
+    if (owner) 
+    {
+        delInstrAfter(startInstr);
+    }
+    if (exprOr(r)) 
     {
         return true;
     }
+
     iTk = start;
+    if (owner) 
+    {
+        delInstrAfter(startInstr);
+    }
     return false;
 }
 
@@ -832,6 +906,8 @@ bool exprRel(Ret *r)
 {
     printf("#exprRel: %s\n", tkCodeName(iTk->code));
     Token *start = iTk;
+    Instr *startInstr = owner ? lastInstr(owner->fn.instr) : NULL;
+
     if (exprAdd(r))
     {
         if (exprRelPrim(r))
@@ -839,38 +915,65 @@ bool exprRel(Ret *r)
             return true;
         }
     }
+
     iTk = start;
+    if (owner) 
+    {
+        delInstrAfter(startInstr);
+    }
     return false;
 }
 
-bool exprRelPrim(Ret *r)
-{
-    printf("#exprRelPrim: %s\n", tkCodeName(iTk->code));
-    Token *start = iTk;
-    // merge oare asa? SAU trebuie if(consume(LESS)) else if(consume(LESSEQ) ) else if(consume(GREATER))...
-   if(consume(LESS) || consume(LESSEQ) || consume(GREATER) || consume(GREATEREQ))
+bool exprRelPrim(Ret *r){
+	Token *op;
+    if (consume(LESS) || consume(LESSEQ) || consume(GREATER) ||consume(GREATEREQ)) 
     {
         Ret right;
-        if (exprAdd(&right))
+
+        op = consumedTk;
+        Instr *lastLeft = lastInstr(owner->fn.instr);
+        addRVal(&owner->fn.instr, r->lval, &r->type);
+
+        if (exprAdd(&right)) 
         {
             Type tDst;
+            if (!arithTypeTo(&r->type, &right.type, &tDst)) 
+            {
+                tkerr("Invalid operand type for <, <=, >,>=");
+            }
 
-			if (!arithTypeTo(&r->type, &right.type, &tDst)) 
-			{
-				tkerr("invalid operand type for <, <=, >, >="); 
-			}
+            addRVal(&owner->fn.instr, right.lval, &right.type);
+            insertConvIfNeeded(lastLeft, &r->type, &tDst);
+            insertConvIfNeeded(lastInstr(owner->fn.instr), &right.type, &tDst);
+            switch (op->code) 
+            {
+                case LESS:
+                    switch (tDst.tb) 
+                    {
+                        case TB_INT:
+                            addInstr(&owner->fn.instr, OP_LESS_I);
+                            break;
+                        case TB_DOUBLE:
+                            addInstr(&owner->fn.instr, OP_LESS_F);
+                            break;
+                    }
+                    break;
+            }
 
-			*r = (Ret){{TB_INT,NULL,-1},false,true};
-            if (exprRelPrim(r))
+            *r = (Ret){{TB_INT, NULL, -1}, false, true};
+
+            if (exprRelPrim(r)) 
             {
                 return true;
             }
+        } 
+        else 
+        {
+            tkerr("Invalid expression after comparison");
         }
-        
     }
-    
-    iTk = start;
-    return true; // epsilon
+
+    return true;
 }
 
 // exprAdd: exprAdd ( ADD | SUB ) exprMul | exprMul
@@ -880,14 +983,21 @@ bool exprAdd(Ret *r)
 {
     printf("#exprAdd: %s\n", tkCodeName(iTk->code));
     Token *start = iTk;
-    if (exprMul(r))
+    Instr *startInstr = owner ? lastInstr(owner->fn.instr) : NULL;
+
+    if (exprMul(r)) 
     {
-        if (exprAddPrim(r))
+        if (exprAddPrim(r)) 
         {
             return true;
         }
     }
+
     iTk = start;
+    if (owner) 
+    {
+        delInstrAfter(startInstr);
+    }
     return false;
 }
 
@@ -898,20 +1008,56 @@ bool exprAddPrim(Ret *r)
     if (consume(ADD) || consume(SUB))
     {
         Ret right;
+        Token *op = consumedTk;
+        Instr *lastLeft = lastInstr(owner->fn.instr);
+        addRVal(&owner->fn.instr, r->lval, &r->type);
+
         if (exprMul(&right))
         {
             Type tDst;
             if (!arithTypeTo(&r->type, &right.type, &tDst)) 
-			{
-				tkerr("invalid operand type for + or -"); 
-			}
-			*r = (Ret){tDst,false,true};
+            {
+                tkerr("Invalid operand type for + or -");
+            }
+
+            addRVal(&owner->fn.instr, right.lval, &right.type);
+            insertConvIfNeeded(lastLeft, &r->type, &tDst);
+            insertConvIfNeeded(lastInstr(owner->fn.instr), &right.type, &tDst);
+            switch (op->code) 
+            {
+                case ADD:
+                    switch (tDst.tb) 
+                    {
+                        case TB_INT:
+                            addInstr(&owner->fn.instr, OP_ADD_I);
+                            break;
+                        case TB_DOUBLE:
+                            addInstr(&owner->fn.instr, OP_ADD_F);
+                            break;
+                    }
+                    break;
+                case SUB:
+                    switch (tDst.tb) 
+                    {
+                        case TB_INT:
+                            addInstr(&owner->fn.instr, OP_SUB_I);
+                            break;
+                        case TB_DOUBLE:
+                            addInstr(&owner->fn.instr, OP_SUB_F);
+                            break;
+                    }
+                    break;
+            }
+
+            *r = (Ret){tDst, false, true};
+
             if (exprAddPrim(r))
             {
                 return true;
             }
         }
-        
+        else
+            tkerr("Lipseste expresia dupa operatorul aditiv");
     }
     iTk = start;
     return true; // epsilon
@@ -925,14 +1071,22 @@ bool exprMul(Ret *r)
 {
     printf("#exprMul: %s\n", tkCodeName(iTk->code));
     Token *start = iTk;
-    if (exprCast(r))
+    Instr *startInstr = owner ? lastInstr(owner->fn.instr) : NULL;
+
+    if (exprCast(r)) 
     {
-        if (exprMulPrim(r))
+        if (exprMulPrim(r)) 
         {
             return true;
         }
     }
+
     iTk = start;
+
+    if (owner) 
+    {
+        delInstrAfter(startInstr);
+    }
     return false;
 }
 
@@ -943,22 +1097,57 @@ bool exprMulPrim(Ret *r)
     if (consume(MUL) || consume(DIV))
     {
         Ret right;
+        Token *op = consumedTk;
+        Instr *lastLeft = lastInstr(owner->fn.instr);
+        addRVal(&owner->fn.instr, r->lval, &r->type);
+
         if (exprCast(&right))
         {
             Type tDst;
 
             if (!arithTypeTo(&r->type, &right.type, &tDst)) 
-			{
-				tkerr("invalid operand type for * or /"); 
-			}
+            {
+                tkerr("Invalid operand type for * or /");
+            }
 
-			*r = (Ret){tDst,false,true};
+            addRVal(&owner->fn.instr, right.lval, &right.type);
+            insertConvIfNeeded(lastLeft, &r->type, &tDst);
+            insertConvIfNeeded(lastInstr(owner->fn.instr), &right.type, &tDst);
+            switch (op->code) 
+            {
+                case MUL:
+                    switch (tDst.tb) 
+                    {
+                        case TB_INT:
+                            addInstr(&owner->fn.instr, OP_MUL_I);
+                            break;
+                        case TB_DOUBLE:
+                            addInstr(&owner->fn.instr, OP_MUL_F);
+                            break;
+                    }
+                    break;
+                case DIV:
+                    switch (tDst.tb) 
+                    {
+                        case TB_INT:
+                            addInstr(&owner->fn.instr, OP_DIV_I);
+                            break;
+                        case TB_DOUBLE:
+                            addInstr(&owner->fn.instr, OP_DIV_F);
+                            break;
+                    }
+                    break;
+            }
+
+            *r = (Ret){tDst, false, true};
+
             if (exprMulPrim(r))
             {
                 return true;
             }
         }
-       
+        else
+            tkerr("Lipseste expresia dupa operatorul multiplicativ");
     }
     iTk = start;
     return true; // epsilon
@@ -976,6 +1165,10 @@ bool exprCast(Ret *r) {
 
 		if(typeBase(&t))
 		{
+			if(arrayDecl(&t))
+			{
+			
+			}
 			if(consume(RPAR))
 			{
 			
@@ -1002,6 +1195,9 @@ bool exprCast(Ret *r) {
 					}
 					*r = (Ret){t,false,true};
 
+					addRVal(&owner->fn.instr, op.lval, &op.type);
+                    insertConvIfNeeded(lastInstr(owner->fn.instr), &op.type, &t);
+
 					return true;
 				}
 			}
@@ -1017,31 +1213,33 @@ bool exprCast(Ret *r) {
 }
 
 // exprUnary: ( SUB | NOT ) exprUnary | exprPostfix
-bool exprUnary(Ret *r)
-{
-    printf("#exprUnary: %s\n", tkCodeName(iTk->code));
-    Token *start = iTk;
-    if (consume(SUB) || consume(NOT))
-    {
-        if (exprUnary(r))
-        {
-            if (!canBeScalar(r)) 
+bool exprUnary(Ret *r) { //--a
+	Token* start=iTk;
+
+	if(consume(SUB) || consume(NOT))
+	{
+		if(exprUnary(r))
+		{
+			if (!canBeScalar(r)) 
 			{
 				tkerr("unary - or ! must have a scalar operand");
 			}
 			r->lval = false;
 			r->ct = true;
-            return true;
-        }
-        iTk = start;
-    }
-    if (exprPostfix(r))
-    {
-        return true;
-    }
-    iTk = start;
-    return false;
+
+			return true;
+		}
+		iTk=start;
+	}
+	if(exprPostfix(r))
+	{
+		return true;
+	}
+
+	iTk=start;
+	return false;
 }
+
 
 // exprPostfix: exprPostfix LBRACKET expr RBRACKET
 //      | exprPostfix DOT ID
@@ -1066,18 +1264,18 @@ bool exprPostfix(Ret *r)
     return false;
 }
 
-bool exprPostfixPrim(Ret *r)
-{
-    printf("#exprPostfixPrim: %s\n", tkCodeName(iTk->code));
-    Token *start = iTk;
-    if (consume(LBRACKET))
-    {
-        Ret idx;
-        if (expr(&idx))
-        {
-            if (consume(RBRACKET))
-            {
-                if (r->type.n < 0) 
+bool exprPostfixPrim(Ret *r){
+	Token* start=iTk;
+
+	if(consume(LBRACKET))
+	{
+		Ret idx;
+
+		if(expr(&idx))
+		{
+			if(consume(RBRACKET))
+			{
+				if (r->type.n < 0) 
 				{
 					tkerr("only an array can be indexed");
 				}
@@ -1093,19 +1291,19 @@ bool exprPostfixPrim(Ret *r)
                 r->lval = true;
                 r->ct = false;
 
-                if (exprPostfixPrim(r))
-                {
-                    return true;
-                }
+				if(exprPostfixPrim(r))
+				{
+					return true;
+				}
 			}
 		}
 		iTk=start;
 	}
 	if(consume(DOT))
-    {
-        if (consume(ID))
-        {
-            Token *tkName = consumedTk;
+	{
+		if(consume(ID))
+		{
+			Token *tkName = consumedTk;
 
 			 if (r->type.tb != TB_STRUCT) 
 			 {
@@ -1120,17 +1318,16 @@ bool exprPostfixPrim(Ret *r)
 			}
 
 			*r = (Ret){s->type,true,s->type.n>=0};
-            if (exprPostfixPrim(r))
-            {
-                return true;
-            }
-        }
-     iTk = start;
-    }
-   
-    return true;
-}
 
+			if(exprPostfixPrim(r))
+			{
+				return true;
+			}
+		}
+		iTk=start;
+	}
+	return true;
+}
 // exprPrimary: ID ( LPAR ( expr ( COMMA expr )* )? RPAR )?
 //      | INT | DOUBLE | CHAR | STRING | LPAR expr RPAR
 bool exprPrimary(Ret *r) { 
@@ -1166,6 +1363,9 @@ bool exprPrimary(Ret *r) {
 					tkerr("in call, cannot convert the argument type to the parameter type");
 				}
 
+				addRVal(&owner->fn.instr, rArg.lval, &rArg.type);
+                insertConvIfNeeded(lastInstr(owner->fn.instr), &rArg.type, &param->type);
+
 				param=param->next;
 
 				for(;;)
@@ -1183,6 +1383,9 @@ bool exprPrimary(Ret *r) {
 							{
 								tkerr("in call, cannot convert the argument type to the parameter type");
 							}
+
+							addRVal(&owner->fn.instr, rArg.lval, &rArg.type);
+                            insertConvIfNeeded(lastInstr(owner->fn.instr), &rArg.type, &param->type);
 							
 							param=param->next;
 						}
@@ -1204,7 +1407,18 @@ bool exprPrimary(Ret *r) {
 					tkerr("too few arguments in function call");
 				}
 
-				*r = (Ret){s->type,false,true};			
+				*r = (Ret){s->type,false,true};
+
+				if (s->fn.extFnPtr) 
+                {
+                    addInstr(&owner->fn.instr, OP_CALL_EXT)->arg.extFnPtr = s->fn.extFnPtr;
+                } 
+                else 
+                {
+                    addInstr(&owner->fn.instr, OP_CALL)->arg.instr = s->fn.instr;
+                }
+
+				return true;
 			}
 			else
 			{
@@ -1223,6 +1437,39 @@ bool exprPrimary(Ret *r) {
 				tkerr("a function can only be called"); 
 			}
 			*r = (Ret){s->type,true,s->type.n>=0};
+
+			if (s->kind == SK_VAR) 
+            {
+                if (s->owner == NULL) 
+                {// global variables
+                    addInstr(&owner->fn.instr, OP_ADDR)->arg.p = s->varMem;
+                } 
+                else 
+                {// local variables
+                    switch (s->type.tb) 
+                    {
+                        case TB_INT:
+                            addInstrWithInt(&owner->fn.instr, OP_FPADDR_I, s->varIdx + 1);
+                            break;
+                        case TB_DOUBLE:
+                            addInstrWithInt(&owner->fn.instr, OP_FPADDR_F, s->varIdx + 1);
+                            break;
+                    }
+                }
+            }
+
+            if (s->kind == SK_PARAM) 
+            {
+                switch (s->type.tb) 
+                {
+                    case TB_INT:
+                        addInstrWithInt(&owner->fn.instr, OP_FPADDR_I, s->paramIdx - symbolsLen(s->owner->fn.params) - 1);
+                        break;
+                    case TB_DOUBLE:
+                        addInstrWithInt(&owner->fn.instr, OP_FPADDR_F, s->paramIdx - symbolsLen(s->owner->fn.params) - 1);
+                        break;
+                }
+            }
 		}
 
 		return true;
@@ -1230,11 +1477,15 @@ bool exprPrimary(Ret *r) {
 	if(consume(INT))
 	{
 		*r = (Ret){{TB_INT,NULL,-1},false,true};
+		Token *ct = consumedTk;
+        addInstrWithInt(&owner->fn.instr, OP_PUSH_I, ct->i);
 		return true;
 	}
 	if(consume(DOUBLE))
 	{
 		*r = (Ret){{TB_DOUBLE,NULL,-1},false,true};
+		Token *ct = consumedTk;
+        addInstrWithDouble(&owner->fn.instr, OP_PUSH_F, ct->d);
 		return true;
 	}
 	if(consume(CHAR))
